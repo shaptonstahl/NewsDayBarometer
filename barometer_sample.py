@@ -12,7 +12,7 @@ from tweepy import StreamListener
 import tweepy
 import datetime
 # import json
-# import time
+import time
 import sys
 # import urllib2
 # import urllib
@@ -38,20 +38,20 @@ temp_stream_file = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-
 
 if not os.path.exists(WORKING_PATH):
 	os.makedirs(WORKING_PATH)
+
 if not os.path.exists(DATA_PATH):
 	os.makedirs(DATA_PATH)
 
 def MyStreamListener(StreamListener):
 #    def __init__(self, api = None, sample_size = 5, temp_file = None):
 	def __init__(self, api = None):
-		self.api = api
+		self.api = api or API()
 		self.counter = 0
 		# self.sample_size = sample_size
 		self.sample_size = 2
 		# self.temp_file = temp_file
-		self.temp_file = temp_stream_file
-		self.output = open(temp_file,'w+')
-
+		self.output = open(temp_stream_file,'w+')
+	
 	def on_data(self, data):
     	#this function checks data for validity
 		
@@ -61,7 +61,7 @@ def MyStreamListener(StreamListener):
 		if 'in_reply_to_status' in data:
 			self.on_status(data)
 		return
-
+	
 	def on_status(self,status):
 		#this functions processes each individual tweet
 		self.output.write(status+'\n')
@@ -71,14 +71,15 @@ def MyStreamListener(StreamListener):
 			return False
 		else:
 			return True
+	
 	def on_limit(self, track):
 		sys.stderr.write(track+'\n')
 		return
-
+	
 	def on_error(self, status_code):
 		sys.stderr.write('Error: '+str(status_code)+'\n')
 		return False
-
+	
 	def on_timeout(self):
 		sys.stderr.write('Timeout, sleeping for 60 seconds...\n')
 		time.sleep(60)
@@ -100,7 +101,7 @@ print 'Streaming started...'
 
 try:
 	# let's try this without a 'track' parameter
-	stream.filter(track='spam')
+	stream.filter(track='machinelearning')
 except IOError as e:
 	print e.strerror
 except:
