@@ -24,6 +24,7 @@ import sys
 # import progressbar
 # import codecs
 import os
+import unshorten_url
 
 WORKING_PATH = '/Users/stephenh/github/NewsDayBarometer/temp'
 DATA_PATH = '/Users/stephenh/github/NewsDayBarometer/data'
@@ -32,9 +33,12 @@ CONSUMER_KEY = 'rocvYBcGgKBfNLHHZlkCVAY6i'
 CONSUMER_SECRET = 'wWlkoEYdFQf7Mrc4zDiFXAknrnfkPY0arbSjr3uRSXvBRtiTwB'
 ACCESS_TOKEN_KEY = '17050800-zijJEwmbyJARHllbJutCX0S5t5MBOhhGTPKlZSf7m'
 ACCESS_TOKEN_SECRET = 'WFU3FdrosBnEeZcVTbJVJfRlyJNQEHujUDUPhDxmuz2QW'
-SAMPLE_SIZE = 1
+SAMPLE_SIZE = 100
+# can stream about 1000 / minute
 
-temp_stream_file = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S') + '.json'
+temp_file_no_extension = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S')
+temp_stream_file = temp_file_no_extension + '.csv'
+temp_unshortened_file = temp_file_no_extension + '_unshortened.csv'
 
 if not os.path.exists(WORKING_PATH):
 	os.makedirs(WORKING_PATH)
@@ -42,48 +46,22 @@ if not os.path.exists(WORKING_PATH):
 if not os.path.exists(DATA_PATH):
 	os.makedirs(DATA_PATH)
 
-def MyStreamListener(StreamListener):
-#    def __init__(self, api = None, sample_size = 5, temp_file = None):
-	def __init__(self, api = None):
-		self.api = api or API()
-		self.counter = 0
-		# self.sample_size = sample_size
-		self.sample_size = 2
-		# self.temp_file = temp_file
-		self.output = open(temp_stream_file,'w+')
+class listener(StreamListener):
+	def __init__(self, api = None, n_tweets_to_collect = 10, output_filename = None):
+		self.api = api
+		self.n_tweets_to_collect = n_tweets_to_collect
+		self.n_tweets_collected = 0
+		self.f = open(output_filename, 'w+')
 	
-	def on_data(self, data):
-    	#this function checks data for validity
-		
-		#turns off the stream once we hit tweet_max
-		if self.counter >=self.sample_size:
+	def on_status(self, status):
+		self.n_tweets_collected += 1
+		try:
+			self.f.write(status.entities['urls'][0]['expanded_url'].encode('utf-8') + '\n')
+		except:
+			pass
+		if self.n_tweets_collected >= self.n_tweets_to_collect:
+			self.f.close()
 			return False
-		if 'in_reply_to_status' in data:
-			self.on_status(data)
-		return
-	
-	def on_status(self,status):
-		#this functions processes each individual tweet
-		self.output.write(status+'\n')
-		self.counter += 1
-		if self.counter >= self.sample_size:
-			self.output.close()
-			return False
-		else:
-			return True
-	
-	def on_limit(self, track):
-		sys.stderr.write(track+'\n')
-		return
-	
-	def on_error(self, status_code):
-		sys.stderr.write('Error: '+str(status_code)+'\n')
-		return False
-	
-	def on_timeout(self):
-		sys.stderr.write('Timeout, sleeping for 60 seconds...\n')
-		time.sleep(60)
-		return
 
 #initialize twitter api
 auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
@@ -94,17 +72,23 @@ api = tweepy.API(auth)
 #begin streaming tweets
 print 'Fetching sample of tweets'
 
-#listen = MyStreamListener(api, sample_size = SAMPLE_SIZE, temp_file = temp_stream_file)
-listen = MyStreamListener(api)
-stream = tweepy.streaming.Stream(auth, listen)
+stream = tweepy.streaming.Stream(auth, listener(api, SAMPLE_SIZE, temp_stream_file))
 print 'Streaming started...'
 
 try:
-	# let's try this without a 'track' parameter
-	stream.filter(track='machinelearning')
+	stream.sample(languages=['en'])
 except IOError as e:
 	print e.strerror
 except:
 	print sys.exc_info()[0]
 	print 'error!'
 	stream.disconnect()
+
+# unshorten the urls
+print 'Unshortening the urls...'
+with open(temp_stream_file, 'r') as f_in:
+	with open(temp_unshortened_file, 'w') as f_out:
+		for url in f_in:
+			unshortened_url = unshorten_url.unshorten_url(url)
+			if unshortened_url:
+				f_out.write(unshortened_url + '\n')

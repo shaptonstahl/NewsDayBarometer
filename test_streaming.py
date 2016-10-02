@@ -21,9 +21,9 @@ class Listener(StreamListener):
 		self.f = open(output_filename, 'w+')
 	
 	def on_status(self, status):
+		self.n_tweets_collected += 1
 		try:
 			self.f.write(status.entities['urls'][0]['expanded_url'].encode('utf-8') + '\n')
-			self.n_tweets_collected += 1
 		except:
 			pass
 		if self.n_tweets_collected >= self.n_tweets_to_collect:
@@ -31,10 +31,4 @@ class Listener(StreamListener):
 			return False
 
 twitterStream = tweepy.streaming.Stream(auth, Listener(api, 15, 'test_tweet_data.txt'))
-# twitterStream.filter(track = 'http')
 twitterStream.sample(languages=['en'])
-
-
-# need to figure out how to store the expanded_url instead of the text of the tweet
-# If possible, limit to English tweets
-# maybe use .encode('punycode')
