@@ -24,17 +24,18 @@ import sys
 # import progressbar
 # import codecs
 import os
+import re
 import unshorten_url
+
+# set CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET
+import twitter_credentials
 
 WORKING_PATH = '/Users/stephenh/github/NewsDayBarometer/temp'
 DATA_PATH = '/Users/stephenh/github/NewsDayBarometer/data'
-CATEGORIES_FILE = '/Users/stephenh/github/NewsDayBarometer/categories.csv'
-CONSUMER_KEY = 'rocvYBcGgKBfNLHHZlkCVAY6i'
-CONSUMER_SECRET = 'wWlkoEYdFQf7Mrc4zDiFXAknrnfkPY0arbSjr3uRSXvBRtiTwB'
-ACCESS_TOKEN_KEY = '17050800-zijJEwmbyJARHllbJutCX0S5t5MBOhhGTPKlZSf7m'
-ACCESS_TOKEN_SECRET = 'WFU3FdrosBnEeZcVTbJVJfRlyJNQEHujUDUPhDxmuz2QW'
+CATEGORY_INPUT_FOLDER = '/Users/stephenh/github/NewsDayBarometer/outlets/v_2016-10-03'
 SAMPLE_SIZE = 100
 # can stream about 1000 / minute
+# unshortening takes...?
 
 temp_file_no_extension = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S')
 temp_stream_file = temp_file_no_extension + '.csv'
@@ -92,3 +93,26 @@ with open(temp_stream_file, 'r') as f_in:
 			unshortened_url = unshorten_url.unshorten_url(url)
 			if unshortened_url:
 				f_out.write(unshortened_url + '\n')
+
+# read outlets
+raw_file_names = os.listdir(CATEGORY_INPUT_FOLDER)
+file_names = [x for x in raw_file_names if re.search('\.csv$', x)]
+
+categories = [x.replace('.csv', '') for x in file_names]
+
+# data structure: dictionary with key=file name stem and value = array of dictionaries
+# each dictionary is a row in the dataset
+outlets = {}
+
+for i in range(len(file_names)):
+	dataset = []
+	with open(os.path.join(CATEGORY_INPUT_FOLDER, file_names[i]), 'r') as f:
+		whole_file = f.readline()
+		lines = whole_file.split('\r')
+		for line in lines:
+			fields = line.split(',')
+			if fields[0] == 'Outlet':
+				continue
+			row = {'outlet': fields[0], 'url': fields[1], 'twitter': fields[2], 'short url': fields[3]}
+			dataset.append(row)
+	outlets[categories[i]] = dataset
