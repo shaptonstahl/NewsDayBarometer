@@ -33,3 +33,8 @@ def check_url_against_category(url, category):
 		if re.search(url_part_re, url):
 			url_in_category = True
 	return url_in_category
+
+counts = {}
+for category in categories:
+	counts[category] = 0
+

@@ -33,9 +33,10 @@ import twitter_credentials
 WORKING_PATH = '/Users/stephenh/github/NewsDayBarometer/temp'
 DATA_PATH = '/Users/stephenh/github/NewsDayBarometer/counts'
 CATEGORY_INPUT_FOLDER = '/Users/stephenh/github/NewsDayBarometer/outlets/v_2016-10-03'
-SAMPLE_SIZE = 1000
+SAMPLE_SIZE = 10000
 # can stream about 1000 / minute
 # unshortening takes...?
+# total: about 1000 / 5 minutes
 
 temp_file_no_extension = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S')
 temp_stream_file = temp_file_no_extension + '.csv'
@@ -141,6 +142,7 @@ with open(temp_unshortened_file, 'r') as f_unshortened:
 				counts[category] += 1
 
 with open(output_filename, 'w') as f_out:
+	f_out.write('sample size,' + str(SAMPLE_SIZE) + '\n')
 	for k, v in counts.iteritems():
 		f_out.write(k + ',' + str(v) + '\n')
 
