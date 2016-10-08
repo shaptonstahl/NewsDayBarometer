@@ -11,53 +11,45 @@ in various categories to gauge how busy a news day it is.
 from tweepy import StreamListener
 import tweepy
 import datetime
-# import json
 import time
 import sys
-# import urllib2
-# import urllib
-# from urlparse import urlparse
-# from sets import Set
-# from xml.etree import ElementTree as ET
-# from lxml import etree
-# import csv
-# import progressbar
-# import codecs
 import os
 import re
 import unshorten_url
 
 # set CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET
 import twitter_credentials
+# set paths and sample size
+import job_params
 
-WORKING_PATH = '/Users/stephenh/github/NewsDayBarometer/temp'
-DATA_PATH = '/Users/stephenh/github/NewsDayBarometer/counts'
-CATEGORY_INPUT_FOLDER = '/Users/stephenh/github/NewsDayBarometer/outlets/v_2016-10-03'
-SAMPLE_SIZE = 10000
 # can stream about 1000 / minute
 # unshortening takes...?
 # total: about 1000 / 5 minutes
 
-temp_file_no_extension = WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S')
+temp_file_no_extension = job_params.WORKING_PATH + '/' + datetime.datetime.now().strftime('%F_%H-%M-%S')
 temp_stream_file = temp_file_no_extension + '.csv'
 temp_unshortened_file = temp_file_no_extension + '_unshortened.csv'
-output_filename = DATA_PATH + '/counts_' + datetime.datetime.now().strftime('%F') + '.csv'
+temp_counter_file = job_params.WORKING_PATH + '/counter.temp'
+output_filename = job_params.DATA_PATH + '/counts_' + datetime.datetime.now().strftime('%F') + '.csv'
 
-if not os.path.exists(WORKING_PATH):
-	os.makedirs(WORKING_PATH)
+if not os.path.exists(job_params.WORKING_PATH):
+	os.makedirs(job_params.WORKING_PATH)
 
-if not os.path.exists(DATA_PATH):
-	os.makedirs(DATA_PATH)
+if not os.path.exists(job_params.DATA_PATH):
+	os.makedirs(job_params.DATA_PATH)
 
 class listener(StreamListener):
-	def __init__(self, api = None, n_tweets_to_collect = 10, output_filename = None):
+	def __init__(self, api = None, n_tweets_to_collect = 10, output_filename = None, counter_file_name = None):
 		self.api = api
 		self.n_tweets_to_collect = n_tweets_to_collect
 		self.n_tweets_collected = 0
 		self.f = open(output_filename, 'w+')
+		self.counter_file_name = counter_file_name
 	
 	def on_status(self, status):
 		self.n_tweets_collected += 1
+		with open(self.counter_file_name, 'w') as f_counter:
+			f_counter.write(str(self.n_tweets_collected) + '\n')
 		try:
 			self.f.write(status.entities['urls'][0]['expanded_url'].encode('utf-8') + '\n')
 		except:
@@ -75,19 +67,24 @@ api = tweepy.API(auth)
 #begin streaming tweets
 print 'Fetching sample of tweets'
 
-stream = tweepy.streaming.Stream(auth, listener(api, SAMPLE_SIZE, temp_stream_file))
+stream = tweepy.streaming.Stream(auth, listener(api, job_params.SAMPLE_SIZE, temp_stream_file, temp_counter_file))
 print 'Streaming started...'
 
-try:
-	stream.sample(languages=['en'])
-except IOError as e:
-	print e.strerror
-except:
-	print sys.exc_info()[0]
-	print 'error!'
-	stream.disconnect()
+n_sampled = 0
+with open(temp_counter_file, 'w') as f_counter:
+	f_counter.write(str(n_sampled) + '\n')
 
-print 'Sample of ' + str(SAMPLE_SIZE) + ' tweets collected'
+while n_sampled < job_params.SAMPLE_SIZE:
+	try:
+		stream.sample(languages=['en'])
+	except:
+		pass
+	with open(temp_counter_file, 'r') as f_counter:
+		n_sampled = int(f_counter.readline().strip())
+
+stream.disconnect()
+
+print 'Sample of ' + str(n_sampled) + ' tweets collected'
 
 # unshorten the urls
 print 'Unshortening the urls...'
@@ -99,7 +96,7 @@ with open(temp_stream_file, 'r') as f_in:
 				f_out.write(unshortened_url + '\n')
 
 # read outlets
-raw_file_names = os.listdir(CATEGORY_INPUT_FOLDER)
+raw_file_names = os.listdir(job_params.CATEGORY_INPUT_FOLDER)
 file_names = [x for x in raw_file_names if re.search('\.csv$', x)]
 
 categories = [x.replace('.csv', '') for x in file_names]
@@ -110,7 +107,7 @@ outlets = {}
 
 for i in range(len(file_names)):
 	dataset = []
-	with open(os.path.join(CATEGORY_INPUT_FOLDER, file_names[i]), 'r') as f:
+	with open(os.path.join(job_params.CATEGORY_INPUT_FOLDER, file_names[i]), 'r') as f:
 		whole_file = f.readline()
 		lines = whole_file.split('\r')
 		for line in lines:
@@ -142,8 +139,21 @@ with open(temp_unshortened_file, 'r') as f_unshortened:
 				counts[category] += 1
 
 with open(output_filename, 'w') as f_out:
-	f_out.write('sample size,' + str(SAMPLE_SIZE) + '\n')
+	f_out.write('sample size,' + str(n_sampled) + '\n')
 	for k, v in counts.iteritems():
 		f_out.write(k + ',' + str(v) + '\n')
+
+try:
+	os.remove(temp_stream_file)
+except:
+	pass
+try:
+	os.remove(temp_unshortened_file)
+except:
+	pass
+try:
+	os.remove(temp_counter_file)
+except:
+	pass
 
 print 'Complete\n'
